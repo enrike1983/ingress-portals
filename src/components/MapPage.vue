@@ -106,8 +106,8 @@ function hideSuggestions() {
 }
 
 async function fetchMarkers(params = {}) {
-  const username = 'ingress'
-  const password = 'Qu3enai5'
+  const username = import.meta.env.VITE_API_USERNAME
+  const password = import.meta.env.VITE_API_PASSWORD
   const basicAuth = 'Basic ' + btoa(`${username}:${password}`)
 
   // Costruisci la query string dai parametri
