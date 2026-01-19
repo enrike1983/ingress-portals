@@ -5,14 +5,22 @@
         Da:
         <input type="date" v-model="dateFrom" />
         <select v-model="hourFrom">
-          <option v-for="h in 24" :key="h-1" :value="h-1">{{ (h-1).toString().padStart(2, '0') }}:00</option>
+          <option
+            v-for="(label, idx) in timeOptions"
+            :key="idx"
+            :value="label.value"
+          >{{ label.text }}</option>
         </select>
       </label>
       <label>
         A:
         <input type="date" v-model="dateTo" />
         <select v-model="hourTo">
-          <option v-for="h in 24" :key="h-1" :value="h-1">{{ (h-1).toString().padStart(2, '0') }}:00</option>
+          <option
+            v-for="(label, idx) in timeOptions"
+            :key="idx"
+            :value="label.value"
+          >{{ label.text }}</option>
         </select>
       </label>
       <label style="position:relative;">
@@ -60,17 +68,35 @@ const filteredMarkers = ref([])
 
 const dateFrom = ref('')
 const dateTo = ref('')
-const hourFrom = ref(0)
-const hourTo = ref(23)
 const playerFilter = ref('')
 
-// Inizializzazione filtri "da" e "a" predefiniti (un'ora fa -> ora attuale)
+// Opzioni per le select degli orari (ogni 15 minuti)
+const timeOptions = Array.from({ length: 24 * 4 }, (_, i) => {
+  const hour = Math.floor(i / 4)
+  const min = (i % 4) * 15
+  return {
+    value: hour * 60 + min,
+    text: `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`
+  }
+})
+
+const hourFrom = ref(0) // valore in minuti
+const hourTo = ref(23 * 60 + 45) // valore in minuti
+
+// Inizializzazione filtri "da" e "a" predefiniti (un'ora fa -> prossimo quarto d'ora, arrotondati al quarto d'ora)
 const now = new Date()
 const unOraFa = new Date(now.getTime() - 60 * 60 * 1000)
+
+// Calcola il prossimo quarto d'ora
+const nextQuarter = new Date(now)
+const min = nextQuarter.getMinutes()
+const addMin = 15 - (min % 15)
+nextQuarter.setMinutes(min + addMin, 0, 0)
+
 dateFrom.value = unOraFa.toISOString().slice(0, 10)
-hourFrom.value = unOraFa.getHours()
-dateTo.value = now.toISOString().slice(0, 10)
-hourTo.value = now.getHours()
+dateTo.value = nextQuarter.toISOString().slice(0, 10)
+hourFrom.value = unOraFa.getHours() * 60 + Math.floor(unOraFa.getMinutes() / 15) * 15
+hourTo.value = nextQuarter.getHours() * 60 + nextQuarter.getMinutes()
 
 const userList = ref([])
 const showUserSuggestions = ref(false)
@@ -187,12 +213,12 @@ function applyFilters() {
   let params = {}
   if (dateFrom.value) {
     const from = new Date(dateFrom.value)
-    from.setHours(hourFrom.value, 0, 0, 0)
+    from.setHours(Math.floor(hourFrom.value / 60), hourFrom.value % 60, 0, 0)
     params.timestamp_from = from.getTime()
   }
   if (dateTo.value) {
     const to = new Date(dateTo.value)
-    to.setHours(hourTo.value, 59, 59, 999)
+    to.setHours(Math.floor(hourTo.value / 60), hourTo.value % 60, 59, 999)
     params.timestamp_to = to.getTime()
   }
   if (playerFilter.value) {
@@ -204,13 +230,17 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  // Reimposta i filtri all'intervallo predefinito (un'ora fa -> ora attuale)
+  // Reimposta i filtri all'intervallo predefinito (un'ora fa -> prossimo quarto d'ora, arrotondati al quarto d'ora)
   const now = new Date()
   const unOraFa = new Date(now.getTime() - 60 * 60 * 1000)
+  const nextQuarter = new Date(now)
+  const min = nextQuarter.getMinutes()
+  const addMin = 15 - (min % 15)
+  nextQuarter.setMinutes(min + addMin, 0, 0)
   dateFrom.value = unOraFa.toISOString().slice(0, 10)
-  hourFrom.value = unOraFa.getHours()
-  dateTo.value = now.toISOString().slice(0, 10)
-  hourTo.value = now.getHours()
+  dateTo.value = nextQuarter.toISOString().slice(0, 10)
+  hourFrom.value = unOraFa.getHours() * 60 + Math.floor(unOraFa.getMinutes() / 15) * 15
+  hourTo.value = nextQuarter.getHours() * 60 + nextQuarter.getMinutes()
   playerFilter.value = ''
   fetchMarkers().then(() => {
     renderMarkers()
