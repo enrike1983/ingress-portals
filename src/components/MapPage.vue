@@ -64,6 +64,14 @@ const hourFrom = ref(0)
 const hourTo = ref(23)
 const playerFilter = ref('')
 
+// Inizializzazione filtri "da" e "a" predefiniti (un'ora fa -> ora attuale)
+const now = new Date()
+const unOraFa = new Date(now.getTime() - 60 * 60 * 1000)
+dateFrom.value = unOraFa.toISOString().slice(0, 10)
+hourFrom.value = unOraFa.getHours()
+dateTo.value = now.toISOString().slice(0, 10)
+hourTo.value = now.getHours()
+
 const userList = ref([])
 const showUserSuggestions = ref(false)
 
@@ -196,10 +204,13 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  dateFrom.value = ''
-  dateTo.value = ''
-  hourFrom.value = 0
-  hourTo.value = 23
+  // Reimposta i filtri all'intervallo predefinito (un'ora fa -> ora attuale)
+  const now = new Date()
+  const unOraFa = new Date(now.getTime() - 60 * 60 * 1000)
+  dateFrom.value = unOraFa.toISOString().slice(0, 10)
+  hourFrom.value = unOraFa.getHours()
+  dateTo.value = now.toISOString().slice(0, 10)
+  hourTo.value = now.getHours()
   playerFilter.value = ''
   fetchMarkers().then(() => {
     renderMarkers()
