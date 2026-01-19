@@ -18,21 +18,21 @@
       <label style="position:relative;">
         Utente:
         <input
-          type="text"
-          v-model="playerFilter"
-          placeholder="Nome utente"
-          @input="showUserSuggestions = true"
-          @focus="showUserSuggestions = true"
-          @blur="hideSuggestions"
-          autocomplete="off"
+            type="text"
+            v-model="playerFilter"
+            placeholder="Nome utente"
+            @input="showUserSuggestions = true"
+            @focus="showUserSuggestions = true"
+            @blur="hideSuggestions"
+            autocomplete="off"
         />
         <ul v-if="showUserSuggestions && filteredUserSuggestions.length"
             style="position:absolute; background:white; border:1px solid #ccc; z-index:1001; list-style:none; margin:0; padding:0; width:100%;">
           <li
-            v-for="user in filteredUserSuggestions"
-            :key="user"
-            @mousedown.prevent="selectUser(user)"
-            style="padding:4px 8px; cursor:pointer;"
+              v-for="user in filteredUserSuggestions"
+              :key="user"
+              @mousedown.prevent="selectUser(user)"
+              style="padding:4px 8px; cursor:pointer;"
           >{{ user }}</li>
         </ul>
       </label>
@@ -70,7 +70,7 @@ const showUserSuggestions = ref(false)
 const filteredUserSuggestions = computed(() => {
   if (!playerFilter.value) return userList.value
   return userList.value.filter(u =>
-    u.toLowerCase().includes(playerFilter.value.toLowerCase())
+      u.toLowerCase().includes(playerFilter.value.toLowerCase())
   )
 })
 
@@ -101,7 +101,6 @@ function selectUser(user) {
 }
 
 function hideSuggestions() {
-  // Delay per permettere il click su suggestion
   setTimeout(() => { showUserSuggestions.value = false }, 150)
 }
 
@@ -110,7 +109,6 @@ async function fetchMarkers(params = {}) {
   const password = import.meta.env.VITE_API_PASSWORD
   const basicAuth = 'Basic ' + btoa(`${username}:${password}`)
 
-  // Costruisci la query string dai parametri
   const query = new URLSearchParams()
   if (params.timestamp_from) query.append('timestamp_from', params.timestamp_from)
   if (params.timestamp_to) query.append('timestamp_to', params.timestamp_to)
@@ -125,7 +123,6 @@ async function fetchMarkers(params = {}) {
   allMarkers.value = data.plexts || []
   filteredMarkers.value = allMarkers.value
 
-  // Estrai lista utenti unici per autocomplete
   const users = new Set()
   allMarkers.value.forEach(m => {
     if (m.player_name) users.add(m.player_name)
@@ -142,12 +139,11 @@ function renderMarkers() {
   clearMapMarkers()
   filteredMarkers.value.forEach(marker => {
     if (
-      marker.coordinates &&
-      marker.coordinates.coordinates &&
-      Array.isArray(marker.coordinates.coordinates) &&
-      marker.coordinates.coordinates.length === 2
+        marker.coordinates &&
+        marker.coordinates.coordinates &&
+        Array.isArray(marker.coordinates.coordinates) &&
+        marker.coordinates.coordinates.length === 2
     ) {
-      // Colore in base al team
       let color = 'red'
       if (marker.team === 'RESISTANCE') color = 'blue'
       else if (marker.team === 'ENLIGHTENED') color = 'green'
@@ -162,11 +158,11 @@ function renderMarkers() {
       })
 
       const leafletMarker = L.marker(
-        [marker.coordinates.coordinates[1], marker.coordinates.coordinates[0]],
-        { icon }
+          [marker.coordinates.coordinates[1], marker.coordinates.coordinates[0]],
+          { icon }
       )
-        .addTo(map)
-        .bindPopup(`
+          .addTo(map)
+          .bindPopup(`
           <div>
             <strong>${marker.portal_name || ''}</strong><br />
             ${marker.text || ''}<br />
@@ -217,7 +213,6 @@ onMounted(async () => {
   renderMarkers()
 })
 
-// Aggiorna marker quando cambia la lista filtrata
 watch(filteredMarkers, () => {
   renderMarkers()
 })
@@ -230,8 +225,13 @@ function startReplay() {
   replayIndex.value = 0
   replayCurrentTime.value = null
   clearMapMarkers()
+  // Inizializza array per i marker già mostrati
+  shownReplayMarkers.value = []
   replayStep()
 }
+
+// Array reattivo per tenere traccia dei marker già mostrati
+const shownReplayMarkers = ref([])
 
 function replayStep() {
   if (!isReplaying.value) return
@@ -239,32 +239,31 @@ function replayStep() {
     isReplaying.value = false
     return
   }
-  // Trova il timestamp corrente
   const currentTs = sortedReplayMarkers.value[replayIndex.value].timestamp
   replayCurrentTime.value = currentTs
-  // Trova tutte le attività con lo stesso timestamp
   const sameTsMarkers = []
   while (
-    replayIndex.value < sortedReplayMarkers.value.length &&
-    sortedReplayMarkers.value[replayIndex.value].timestamp === currentTs
-  ) {
+      replayIndex.value < sortedReplayMarkers.value.length &&
+      sortedReplayMarkers.value[replayIndex.value].timestamp === currentTs
+      ) {
     sameTsMarkers.push(sortedReplayMarkers.value[replayIndex.value])
     replayIndex.value++
   }
-  // Mostra questi marker sulla mappa
+  // Aggiungi i nuovi marker a quelli già mostrati
+  shownReplayMarkers.value = shownReplayMarkers.value.concat(sameTsMarkers)
   showReplayMarkers(sameTsMarkers)
-  // Avanza di 1 secondo (reale)
   replayTimer.value = setTimeout(replayStep, 1000)
 }
 
 function showReplayMarkers(markers) {
+  // NON cancellare i marker già presenti!
   const latlngs = []
   markers.forEach(marker => {
     if (
-      marker.coordinates &&
-      marker.coordinates.coordinates &&
-      Array.isArray(marker.coordinates.coordinates) &&
-      marker.coordinates.coordinates.length === 2
+        marker.coordinates &&
+        marker.coordinates.coordinates &&
+        Array.isArray(marker.coordinates.coordinates) &&
+        marker.coordinates.coordinates.length === 2
     ) {
       let color = 'red'
       if (marker.team === 'RESISTANCE') color = 'blue'
@@ -283,11 +282,11 @@ function showReplayMarkers(markers) {
       latlngs.push(latlng)
 
       const leafletMarker = L.marker(
-        latlng,
-        { icon }
+          latlng,
+          { icon }
       )
-        .addTo(map)
-        .bindPopup(`
+          .addTo(map)
+          .bindPopup(`
           <div>
             <strong>${marker.portal_name || ''}</strong><br />
             ${marker.text || ''}<br />
@@ -298,7 +297,6 @@ function showReplayMarkers(markers) {
       leafletMarkers.push(leafletMarker)
     }
   })
-  // Centra la mappa sui marker appena aggiunti
   if (latlngs.length === 1) {
     map.setView(latlngs[0], 15)
   } else if (latlngs.length > 1) {
