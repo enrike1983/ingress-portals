@@ -1,12 +1,7 @@
 <script setup>
+import MapPage from './components/MapPage.vue'
 </script>
 
 <template>
-  <header>
-    <div class="wrapper">
-    </div>
-  </header>
-
-  <main>
-  </main>
+  <MapPage />
 </template>
