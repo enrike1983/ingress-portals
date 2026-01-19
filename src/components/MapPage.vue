@@ -39,6 +39,12 @@
       <button type="submit">Filtra</button>
       <button type="button" @click="resetFilters">Reset</button>
     </form>
+    <div style="margin-top: 8px; display: flex; gap: 8px;">
+      <button type="button" @click="startReplay" :disabled="isReplaying || sortedReplayMarkers.length === 0">▶️ Play</button>
+      <button type="button" @click="pauseReplay" :disabled="!isReplaying">⏸️ Pausa</button>
+      <button type="button" @click="resetReplay" :disabled="!isReplayActive">🔄 Reset</button>
+      <span v-if="isReplayActive" style="margin-left: 12px;">Replay: {{ replayCurrentTimeFormatted }}</span>
+    </div>
   </div>
   <div id="map" style="height: 100vh; width: 100vw"></div>
 </template>
@@ -70,6 +76,24 @@ const filteredUserSuggestions = computed(() => {
 
 let map
 let leafletMarkers = []
+
+// Stato per la riproduzione
+const isReplaying = ref(false)
+const isReplayActive = ref(false)
+const replayIndex = ref(0)
+const replayTimer = ref(null)
+const replayCurrentTime = ref(null)
+
+// Markers ordinati per timestamp
+const sortedReplayMarkers = computed(() => {
+  return [...filteredMarkers.value].sort((a, b) => a.timestamp - b.timestamp)
+})
+
+const replayCurrentTimeFormatted = computed(() => {
+  if (!replayCurrentTime.value) return ''
+  const d = new Date(replayCurrentTime.value)
+  return d.toLocaleString()
+})
 
 function selectUser(user) {
   playerFilter.value = user
@@ -197,4 +221,102 @@ onMounted(async () => {
 watch(filteredMarkers, () => {
   renderMarkers()
 })
+
+// Riproduzione replay
+function startReplay() {
+  if (!sortedReplayMarkers.value.length) return
+  isReplaying.value = true
+  isReplayActive.value = true
+  replayIndex.value = 0
+  replayCurrentTime.value = null
+  clearMapMarkers()
+  replayStep()
+}
+
+function replayStep() {
+  if (!isReplaying.value) return
+  if (replayIndex.value >= sortedReplayMarkers.value.length) {
+    isReplaying.value = false
+    return
+  }
+  // Trova il timestamp corrente
+  const currentTs = sortedReplayMarkers.value[replayIndex.value].timestamp
+  replayCurrentTime.value = currentTs
+  // Trova tutte le attività con lo stesso timestamp
+  const sameTsMarkers = []
+  while (
+    replayIndex.value < sortedReplayMarkers.value.length &&
+    sortedReplayMarkers.value[replayIndex.value].timestamp === currentTs
+  ) {
+    sameTsMarkers.push(sortedReplayMarkers.value[replayIndex.value])
+    replayIndex.value++
+  }
+  // Mostra questi marker sulla mappa
+  showReplayMarkers(sameTsMarkers)
+  // Avanza di 1 secondo (reale)
+  replayTimer.value = setTimeout(replayStep, 1000)
+}
+
+function showReplayMarkers(markers) {
+  const latlngs = []
+  markers.forEach(marker => {
+    if (
+      marker.coordinates &&
+      marker.coordinates.coordinates &&
+      Array.isArray(marker.coordinates.coordinates) &&
+      marker.coordinates.coordinates.length === 2
+    ) {
+      let color = 'red'
+      if (marker.team === 'RESISTANCE') color = 'blue'
+      else if (marker.team === 'ENLIGHTENED') color = 'green'
+
+      const icon = L.icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        shadowSize: [41, 41]
+      })
+
+      const latlng = [marker.coordinates.coordinates[1], marker.coordinates.coordinates[0]]
+      latlngs.push(latlng)
+
+      const leafletMarker = L.marker(
+        latlng,
+        { icon }
+      )
+        .addTo(map)
+        .bindPopup(`
+          <div>
+            <strong>${marker.portal_name || ''}</strong><br />
+            ${marker.text || ''}<br />
+            <span>Player: <b>${marker.player_name || ''}</b></span><br />
+            <small>${marker.timestamp_formatted || ''}</small>
+          </div>
+        `)
+      leafletMarkers.push(leafletMarker)
+    }
+  })
+  // Centra la mappa sui marker appena aggiunti
+  if (latlngs.length === 1) {
+    map.setView(latlngs[0], 15)
+  } else if (latlngs.length > 1) {
+    map.fitBounds(latlngs, { padding: [50, 50] })
+  }
+}
+
+function pauseReplay() {
+  isReplaying.value = false
+  if (replayTimer.value) clearTimeout(replayTimer.value)
+}
+
+function resetReplay() {
+  pauseReplay()
+  isReplayActive.value = false
+  replayIndex.value = 0
+  replayCurrentTime.value = null
+  clearMapMarkers()
+  renderMarkers()
+}
 </script>
