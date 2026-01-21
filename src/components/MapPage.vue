@@ -110,6 +110,8 @@ const filteredUserSuggestions = computed(() => {
 
 let map
 let leafletMarkers = []
+let sequencePolyline = null // Per la sequenza dei marker (filtri normali)
+let replaySequencePolyline = null // Per la sequenza dei marker in replay
 
 // Stato per la riproduzione
 const isReplaying = ref(false)
@@ -167,6 +169,75 @@ async function fetchMarkers(params = {}) {
 function clearMapMarkers() {
   leafletMarkers.forEach(m => map.removeLayer(m))
   leafletMarkers = []
+  // Rimuovi la polyline della sequenza se presente
+  if (sequencePolyline) {
+    map.removeLayer(sequencePolyline)
+    sequencePolyline = null
+  }
+  if (replaySequencePolyline) {
+    map.removeLayer(replaySequencePolyline)
+    replaySequencePolyline = null
+  }
+}
+
+// Funzione per disegnare la sequenza dei marker con linea tratteggiata e frecce
+function drawSequenceLine(markers, isReplay = false) {
+  // Rimuovi la polyline precedente se esiste
+  if (isReplay) {
+    if (replaySequencePolyline) {
+      map.removeLayer(replaySequencePolyline)
+      replaySequencePolyline = null
+    }
+  } else {
+    if (sequencePolyline) {
+      map.removeLayer(sequencePolyline)
+      sequencePolyline = null
+    }
+  }
+
+  // Ottieni le coordinate in ordine cronologico
+  const sorted = [...markers].sort((a, b) => a.timestamp - b.timestamp)
+  const latlngs = sorted
+    .filter(m => m.coordinates && m.coordinates.coordinates && m.coordinates.coordinates.length === 2)
+    .map(m => [m.coordinates.coordinates[1], m.coordinates.coordinates[0]])
+
+  if (latlngs.length < 2) return
+
+  // Crea la polyline tratteggiata con frecce
+  const polyline = L.polyline(latlngs, {
+    color: '#333',
+    weight: 3,
+    dashArray: '8, 8',
+    opacity: 0.7
+  }).addTo(map)
+
+  // Aggiungi le frecce (usando plugin leaflet-arrowheads se disponibile, altrimenti fallback)
+  if (polyline.arrowheads) {
+    polyline.arrowheads({ size: '15px', frequency: 'endonly', yawn: 60 })
+  } else {
+    // Fallback: aggiungi una freccia custom sull'ultimo segmento
+    const last = latlngs[latlngs.length - 1]
+    const penult = latlngs[latlngs.length - 2]
+    if (last && penult) {
+      const arrowHead = L.polylineDecorator
+        ? L.polylineDecorator(polyline, {
+            patterns: [
+              {
+                offset: '100%',
+                repeat: 0,
+                symbol: L.Symbol.arrowHead({ pixelSize: 15, polygon: false, pathOptions: { stroke: true, color: '#333' } })
+              }
+            ]
+          }).addTo(map)
+        : null
+    }
+  }
+
+  if (isReplay) {
+    replaySequencePolyline = polyline
+  } else {
+    sequencePolyline = polyline
+  }
 }
 
 function renderMarkers() {
@@ -207,6 +278,8 @@ function renderMarkers() {
       leafletMarkers.push(leafletMarker)
     }
   })
+  // Disegna la sequenza dei marker filtrati
+  drawSequenceLine(filteredMarkers.value, false)
 }
 
 function applyFilters() {
@@ -343,6 +416,8 @@ function showReplayMarkers(markers) {
   } else if (latlngs.length > 1) {
     map.fitBounds(latlngs, { padding: [50, 50] })
   }
+  // Dopo aver aggiunto i marker, disegna la sequenza dei marker già mostrati
+  drawSequenceLine(shownReplayMarkers.value, true)
 }
 
 function pauseReplay() {
